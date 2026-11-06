@@ -26,7 +26,7 @@
 
 // -------------------------- variables --------------------------
 // shader names
-const char* shdr_vert = "ex.3-04_02_Shader.vert", *shdr_frag = "ex.3-04_02_Shader.frag";
+const char* shdr_vert = "vert_shader.vert", *shdr_frag = "frag_shader.frag";
 
 // ids
 GLuint id_vao, id_vbo, id_ebo, id_program;
