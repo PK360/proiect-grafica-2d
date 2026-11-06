@@ -19,9 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
+    <LanguageStandard>stdcpp20</LanguageStandard>
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{$guid1$}</ProjectGuid>
+    <ProjectGuid>{B9B1C610-CDDE-566E-C9FA-8AE0758D4B89}</ProjectGuid>
     <RootNamespace>$safeprojectname$</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
@@ -135,6 +136,7 @@ xcopy /y /d "$(ProjectDir)lib\x32\SOIL\*.dll" "$(OutDir)" &amp;</Command>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

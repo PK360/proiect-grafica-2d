@@ -8,19 +8,18 @@
 
 #include <GL/glew.h>        
 #include <GLFW/glfw3.h>     
-#include <GL/freeglut.h>    
-                            
-#include "loadShaders.h"    
+#include <GL/freeglut.h>
+
+#include "loadShaders.h"
 #include "glm/glm.hpp"      
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "SOIL.h"
 
+#include <string>
+
 #include "classes/PhysicsOOP.h"
-
-//using namespace std;
-
 
 
 
@@ -32,7 +31,7 @@ const char* shdr_vert = "vert_shader.vert", *shdr_frag = "frag_shader.frag";
 GLuint id_vao, id_vbo, id_ebo, id_program;
 
 // textures
-std::vector<GLuint> text_balls(15);
+std::vector<GLuint> text_balls(16);
 
 // uniform locations
 GLuint loc_codCol, loc_myMatrix, loc_uvOffset;
@@ -122,8 +121,8 @@ void Initialize(void) {
     physics.init();
 
     // texturi bile
-    for(int i = 0; i < 15; i++) {
-        std::string path = "textures/balls/ball-" + std::to_string(i + 1) + ".png";
+    for(int i = 0; i < 16; i++) {
+        std::string path = "textures/balls/ball-" + std::to_string(i) + ".png";
         text_balls[i] = LoadTexture(path.c_str());
         
         // momentan sunt doar randomly spawned pe masa
