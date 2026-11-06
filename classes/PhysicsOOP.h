@@ -51,96 +51,82 @@ public:
 
 	// functions
 	void update(float deltatime) {
-		updateGrid();
+        updateGrid();
         updateCollidedCircles();
 
-		float radius = global::ballSize;
-		float min_x = global::tableMinX + radius, max_x = global::tableMaxX - radius;
-		float min_y = global::tableMinY + radius, max_y = global::tableMaxY - radius;
+        float radius = global::ballSize, pocketSize = global::pocketSize;
         
-        // Definim mărimea găurilor (pockets) pentru a lăsa spațiu liber la capete și mijloc
-        float pocketSize = radius * 0.75f; // poți ajusta valoarea în funcție de cât de mari sunt găurile
-        
-        
-        float mid_x = (global::tableMinX + global::tableMaxX) / 2.0f;
-        float mid_y = (global::tableMinY + global::tableMaxY) / 2.0f;
+		float frict_mult = frict * deltatime;
+        float min_x = global::tableMinX, max_x = global::tableMaxX;
+        float min_y = global::tableMinY, max_y = global::tableMaxY;
+        float mid_x = (min_x + max_x) / 2.0f;
+
+        struct Segment { Vec2f a, b; };
+        Segment walls[6] = {
+            {{min_x, min_y + pocketSize}, {min_x, max_y - pocketSize}}, // stanga
+            {{max_x, min_y + pocketSize}, {max_x, max_y - pocketSize}}, // dreapta
+            {{min_x + pocketSize, min_y}, {mid_x - pocketSize, min_y}}, // st. jos
+            {{mid_x + pocketSize, min_y}, {max_x - pocketSize, min_y}}, // dr, jos
+            {{min_x + pocketSize, max_y}, {mid_x - pocketSize, max_y}}, // st. sus
+            {{mid_x + pocketSize, max_y}, {max_x - pocketSize, max_y}}  // dr. sus
+        };
 
         for (Ball* shape : shapes) {
             Vec2f pos = shape->getPosition(), speed = shape->getSpeed();
-            
-			
 
+            // friction
+            speed.x -= speed.x * frict_mult;
+            speed.y -= speed.y * frict_mult;
 
-            // 2. Apply frict (frame-rate independent)
-            speed.x -= speed.x * frict * deltatime;
-            speed.y -= speed.y * frict * deltatime;
-
-            // 3. Clamp to zero if it's moving too slowly
-            if (speed.sqrMagnitude() < stop_move) {
-                speed.x = 0.0f;
-                speed.y = 0.0f;
-            }
+			// null movement
+            if (speed.sqrMagnitude() < stop_move) { speed.x = 0.0f; speed.y = 0.0f; }
 
             float moveX = speed.x * deltatime, moveY = speed.y * deltatime;
             pos.x += moveX; pos.y += moveY;
-
-            // Scroll the UVs. (Y is subtracted due to OpenGL's inverted Y axis)
             shape->add_uv(Vec2f(-moveX / circ, moveY / circ));
 
+			
 
+            // collision
+            for (int i = 0; i < 6; i++) {
+                Vec2f a = walls[i].a, b = walls[i].b;
+                float ab_x = b.x - a.x, ab_y = b.y - a.y;
 
-			// --- COLIZIUNEA CU CELE 6 SEGMENTE DE DREAPTA ---
-            
-            // 1. Peretele din STANGA (o singură linie verticală, cu spații sus și jos pentru găuri de colț)
-            if (pos.x <= min_x) {
-                // Verificăm dacă NU este în dreptul găurii de colț de sus sau de jos
-                if (pos.y > min_y + pocketSize && pos.y < max_y - pocketSize) {
-                    pos.x = min_x; 
-                    if (speed.x < 0) { speed.x = -speed.x; }
-                }
-            }
-            // 2. Peretele din DREAPTA
-            else if (pos.x >= max_x) {
-                if (pos.y > min_y + pocketSize && pos.y < max_y - pocketSize) {
-                    pos.x = max_x; 
-                    if (speed.x > 0) { speed.x = -speed.x; }
-                }
-            }
+                // segment projection point
+                float t = ((pos.x - a.x) * ab_x + (pos.y - a.y) * ab_y) / (ab_x * ab_x + ab_y * ab_y);
+                t = std::clamp(t, 0.0f, 1.0f);
 
-            // 3. Peretele de JOS (împărțit în 2 segmente de gaura din mijloc)
-            if (pos.y <= min_y) {
-                // Verificăm să fie pe unul dintre cele două segmente de jos (evitând colțurile și gaura din mijloc)
-                bool isNotInPocketX = (pos.x > min_x + pocketSize && pos.x < mid_x - pocketSize) || 
-                                      (pos.x > mid_x + pocketSize && pos.x < max_x - pocketSize);
-                if (isNotInPocketX) {
-                    pos.y = min_y; 
-                    if (speed.y < 0) { speed.y = -speed.y; }
-                }
-            }
-            // 4. Peretele de SUS (împărțit în 2 segmente de gaura din mijloc)
-            else if (pos.y >= max_y) {
-                bool isNotInPocketX = (pos.x > min_x + pocketSize && pos.x < mid_x - pocketSize) || 
-                                      (pos.x > mid_x + pocketSize && pos.x < max_x - pocketSize);
-                if (isNotInPocketX) {
-                    pos.y = max_y; 
-                    if (speed.y > 0) { speed.y = -speed.y; }
+				// determine distance from projection to center
+                float close_x = a.x + t * ab_x, close_y = a.y + t * ab_y;
+                float dx = pos.x - close_x, dy = pos.y - close_y;
+                float dist_sqr = dx * dx + dy * dy;
+
+				// check if distance is < radius
+                if (dist_sqr < radius * radius && dist_sqr > 0.0001f) {
+                    float dist = std::sqrt(dist_sqr);
+                    
+                    // normala distantei
+					float nx = dx / dist, ny = dy / dist;
+
+					float overlap = radius - dist;
+                    pos.x += nx * overlap; pos.y += ny * overlap;
+
+                    // push ball back
+                    float prod = speed.x * nx + speed.y * ny;
+                    if (prod < 0) { speed.x -= 2.0f * prod * nx; speed.y -= 2.0f * prod * ny; }
                 }
             }
 
-			shape->setPosition(pos);
-			shape->setSpeed(speed);
-		}
-	}
+            shape->setPosition(pos);
+            shape->setSpeed(speed);
+        }
+    }
 
 	void updateGrid() {
-		for (auto& gridCell : grid) {
-			gridCell.clear();
-		}
+		for (auto& gridCell : grid) { gridCell.clear(); }
 
 		int shape_nr = shapes.size();
-		for (int i = 0; i < shape_nr; i++) {
-			grid[cellIndex(shapes[i]->getPosition())].push_back(i);
-		}
+		for (int i = 0; i < shape_nr; i++) { grid[cellIndex(shapes[i]->getPosition())].push_back(i); }
 	}
 
 	int cellIndex(Vec2f position) const {
