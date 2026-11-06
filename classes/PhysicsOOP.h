@@ -57,10 +57,20 @@ public:
 		float radius = global::ballSize;
 		float min_x = global::tableMinX + radius, max_x = global::tableMaxX - radius;
 		float min_y = global::tableMinY + radius, max_y = global::tableMaxY - radius;
+        
+        // Definim mărimea găurilor (pockets) pentru a lăsa spațiu liber la capete și mijloc
+        float pocketSize = radius * 0.75f; // poți ajusta valoarea în funcție de cât de mari sunt găurile
+        
+        
+        float mid_x = (global::tableMinX + global::tableMaxX) / 2.0f;
+        float mid_y = (global::tableMinY + global::tableMaxY) / 2.0f;
 
         for (Ball* shape : shapes) {
             Vec2f pos = shape->getPosition(), speed = shape->getSpeed();
             
+			
+
+
             // 2. Apply frict (frame-rate independent)
             speed.x -= speed.x * frict * deltatime;
             speed.y -= speed.y * frict * deltatime;
@@ -79,17 +89,43 @@ public:
 
 
 
-			if (pos.x <= min_x) {
-				pos.x = min_x; if (speed.x < 0) { speed.x = -speed.x; }
-			} else if (pos.x >= max_x) {
-				pos.x = max_x; if (speed.x > 0) { speed.x = -speed.x; }
-			}
+			// --- COLIZIUNEA CU CELE 6 SEGMENTE DE DREAPTA ---
+            
+            // 1. Peretele din STANGA (o singură linie verticală, cu spații sus și jos pentru găuri de colț)
+            if (pos.x <= min_x) {
+                // Verificăm dacă NU este în dreptul găurii de colț de sus sau de jos
+                if (pos.y > min_y + pocketSize && pos.y < max_y - pocketSize) {
+                    pos.x = min_x; 
+                    if (speed.x < 0) { speed.x = -speed.x; }
+                }
+            }
+            // 2. Peretele din DREAPTA
+            else if (pos.x >= max_x) {
+                if (pos.y > min_y + pocketSize && pos.y < max_y - pocketSize) {
+                    pos.x = max_x; 
+                    if (speed.x > 0) { speed.x = -speed.x; }
+                }
+            }
 
-			if (pos.y <= min_y) {
-				pos.y = min_y; if (speed.y < 0) { speed.y = -speed.y; }
-			} else if (pos.y >= max_y) {
-				pos.y = max_y; if (speed.y > 0) { speed.y = -speed.y; }
-			}
+            // 3. Peretele de JOS (împărțit în 2 segmente de gaura din mijloc)
+            if (pos.y <= min_y) {
+                // Verificăm să fie pe unul dintre cele două segmente de jos (evitând colțurile și gaura din mijloc)
+                bool isNotInPocketX = (pos.x > min_x + pocketSize && pos.x < mid_x - pocketSize) || 
+                                      (pos.x > mid_x + pocketSize && pos.x < max_x - pocketSize);
+                if (isNotInPocketX) {
+                    pos.y = min_y; 
+                    if (speed.y < 0) { speed.y = -speed.y; }
+                }
+            }
+            // 4. Peretele de SUS (împărțit în 2 segmente de gaura din mijloc)
+            else if (pos.y >= max_y) {
+                bool isNotInPocketX = (pos.x > min_x + pocketSize && pos.x < mid_x - pocketSize) || 
+                                      (pos.x > mid_x + pocketSize && pos.x < max_x - pocketSize);
+                if (isNotInPocketX) {
+                    pos.y = max_y; 
+                    if (speed.y > 0) { speed.y = -speed.y; }
+                }
+            }
 
 			shape->setPosition(pos);
 			shape->setSpeed(speed);

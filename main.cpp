@@ -44,8 +44,6 @@ PhysicsOOP physics;
 
 // other variables
 int last_t;
-glm::vec2 range_x{-400.0f, 400.0f}, range_y{-300.0f, 300.0f};
-glm::vec2 delta{range_x.y - range_x.x, range_y.y - range_y.x};
 
 
 
@@ -141,8 +139,23 @@ void Initialize(void) {
     loc_myMatrix = glGetUniformLocation(id_program, "myMatrix");
     loc_uvOffset = glGetUniformLocation(id_program, "uvOffset");
 
-    matr_resize = glm::ortho(range_x.x, range_x.y, range_y.x, range_y.y);
+    matr_resize = glm::ortho(global::range_x.x, global::range_x.y, global::range_y.x, global::range_y.y);
     last_t = glutGet(GLUT_ELAPSED_TIME);
+}
+
+// Funcție ajutătoare pentru desenarea unei găuri (pochet)
+void drawPocket(float x, float y, float size) {
+    glm::mat4 matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0.0f));
+    glm::mat4 matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(size, size, 1.0f));
+    glm::mat4 matr_final = matr_resize * matr_transl * matr_scale;
+    
+    glUniformMatrix4fv(loc_myMatrix, 1, GL_FALSE, &matr_final[0][0]);
+    
+    // Presupunem că în shader codCol = 2 sau un cod dedicat înseamnă culoarea neagră,
+    // sau poți folosi 0 dacă tratezi manual culoarea. Să zicem codCol = 2 pentru negru:
+    glUniform1i(loc_codCol, 2); 
+    
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }
 
 //  Functia de desenare
@@ -159,20 +172,35 @@ void render(void) {
 
 
 
-    // masa de billiard
+// 1. Masa de biliard (suprafața verde)
     glUniform2f(loc_uvOffset, 0.0f, 0.0f);
     float table_w = global::tableMaxX - global::tableMinX, table_h = global::tableMaxY - global::tableMinY;
-    float table_center_x = (global::tableMinX + global::tableMaxX) / 2.0f, table_center_y = (global::tableMinY + global::tableMaxY) / 2.0f;
+    float table_center_x = (global::tableMinX + global::tableMaxX) / 2.0f;
+    float table_center_y = (global::tableMinY + global::tableMaxY) / 2.0f;
     
     matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(table_center_x, table_center_y, 0.0f)); 
     matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(table_w, table_h, 1.0f));
     matr_final = matr_resize * matr_transl * matr_scale;
     
     glUniformMatrix4fv(loc_myMatrix, 1, GL_FALSE, &matr_final[0][0]);
-    glUniform1i(loc_codCol, 0);
-    
+    glUniform1i(loc_codCol, 0); // 0 = verde / postav
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+    // 2. Găurile negre (Pocheturile - cele 6 poziții corespunzătoare coliziunilor)
+    float pocketDiameter = global::ballSize * 3.5f; // Dimensiunea vizuală a găurii negre
+    float min_x = global::tableMinX;
+    float max_x = global::tableMaxX;
+    float min_y = global::tableMinY;
+    float max_y = global::tableMaxY;
+    float mid_x = table_center_x;
+
+    // Cele 4 găuri de colț + 2 găuri de la mijlocul laturilor lungi
+    drawPocket(min_x, min_y, pocketDiameter); // Colț stânga-jos
+    drawPocket(max_x, min_y, pocketDiameter); // Colț dreapta-jos
+    drawPocket(min_x, max_y, pocketDiameter); // Colț stânga-sus
+    drawPocket(max_x, max_y, pocketDiameter); // Colț dreapta-sus
+    drawPocket(mid_x, min_y, pocketDiameter); // Mijloc jos
+    drawPocket(mid_x, max_y, pocketDiameter); // Mijloc sus
 
 
     // bilele

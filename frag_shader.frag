@@ -53,10 +53,10 @@ void main(void) {
 
     out_Color = texColor;
   }
-  else {
-    vec4 texColor = texture(myTexture, tex_Coord);
-    if (texColor.a < 0.1) { discard; }
-    
-    out_Color = texColor;
+  else if(codCol ==2)
+  {
+    //vec4 texColor = texture(myTexture, tex_Coord);
+    //if (texColor.a < 0.1) { discard; }
+    out_Color = vec4(0.0, 0.0, 0.0, 1.0);
   }
 } 
