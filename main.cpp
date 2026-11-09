@@ -306,16 +306,25 @@ void render(void) {
 
     // gaurile mesei din colturi
     float pocketDiameter = global::pocketSize * 2.0f;
-    float min_x = global::tableMinX, max_x = global::tableMaxX;
-    float min_y = global::tableMinY, max_y = global::tableMaxY;
-    float mid_x = table_center_x;
+    float gaura_min_x = global::tableMinX, gaura_max_x = global::tableMaxX;
+    float gaura_min_y = global::tableMinY, gaura_max_y = global::tableMaxY;
+    float gaura_mid_x = table_center_x;
 
-    drawPocket(min_x, max_y, pocketDiameter); // stanga  sus
-    drawPocket(min_x, min_y, pocketDiameter); // stanga  jos
-    drawPocket(mid_x, max_y, pocketDiameter); // mijloc  sus
-    drawPocket(mid_x, min_y, pocketDiameter); // mijloc  jos
-    drawPocket(max_x, max_y, pocketDiameter); // dreapta sus
-    drawPocket(max_x, min_y, pocketDiameter); // dreapta jos
+    std::vector<glm::vec2> pockets = {
+        {gaura_min_x, gaura_max_y}, 
+        {gaura_min_x, gaura_min_y}, 
+        {gaura_mid_x, gaura_max_y}, 
+        {gaura_mid_x, gaura_min_y}, 
+        {gaura_max_x, gaura_max_y}, 
+        {gaura_max_x, gaura_min_y}    
+    };
+
+    drawPocket(gaura_min_x, gaura_max_y, pocketDiameter); // stanga  sus
+    drawPocket(gaura_min_x, gaura_min_y, pocketDiameter); // stanga  jos
+    drawPocket(gaura_mid_x, gaura_max_y, pocketDiameter); // mijloc  sus
+    drawPocket(gaura_mid_x, gaura_min_y, pocketDiameter); // mijloc  jos
+    drawPocket(gaura_max_x, gaura_max_y, pocketDiameter); // dreapta sus
+    drawPocket(gaura_max_x, gaura_min_y, pocketDiameter); // dreapta jos
 
 
 
@@ -375,6 +384,43 @@ void render(void) {
         }
     }
 
+
+    {
+        float pocketRadius = global::pocketSize; // raza găurii
+
+        auto& shapes = physics.getShapes();
+        for (size_t i = 0; i < shapes.size(); i++) {
+            // Ignorăm bilele care au fost deja trimise în afara mesei
+            if (shapes[i]->getPosition().x < -5000.0f) continue;
+
+            Vec2f bPos = shapes[i]->getPosition();
+            glm::vec2 ballPos(bPos.x, bPos.y);
+
+            bool inPocket = false;
+            for (const auto& p : pockets) {
+                float dist = glm::distance(ballPos, p);
+                if (dist < pocketRadius) {
+                    inPocket = true;
+                    break;
+                }
+            }
+
+            if (inPocket) {
+                // Dacă este bila albă (indexul 0), o resetăm la poziția de start
+                if (i == 0) {
+                    float cueX = global::tableMinX + table_w * 0.25f;
+                    shapes[i]->setPosition({cueX, table_center_y});
+                    shapes[i]->setSpeed({0.0f, 0.0f});
+                    aiming = false;
+                    cueStriking = false;
+                } else {
+                    // Pentru celelalte bile: le trimitem în afara ecranului și le oprim fizica
+                    shapes[i]->setPosition({-9999.0f, -9999.0f});
+                    shapes[i]->setSpeed({0.0f, 0.0f});
+                }
+            }
+        }
+    }
 
 
     // bilele de biliard
