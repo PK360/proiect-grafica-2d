@@ -48,7 +48,6 @@ public:
 	void setSquaredRadius(float sqr_rad) { sqr_radius = sqr_rad; }
 
 
-
 	// functions
 	void update(float deltatime) {
 		updateGrid();
@@ -233,4 +232,12 @@ public:
 			}
 		}
 	}
+
+		
+	void removeShape(int index) {
+        if (index >= 0 && index < shapes.size()) {
+            delete shapes[index];
+            shapes.erase(shapes.begin() + index);
+        }
+    }
 };

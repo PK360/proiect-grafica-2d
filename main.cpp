@@ -186,6 +186,7 @@ void render(void) {
     glUniform1i(loc_codCol, 0); // 0 = verde / postav
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+<<<<<<< Updated upstream
     // 2. Găurile negre (Pocheturile - cele 6 poziții corespunzătoare coliziunilor)
     float pocketDiameter = global::ballSize * 3.5f; // Dimensiunea vizuală a găurii negre
     float min_x = global::tableMinX;
@@ -201,6 +202,126 @@ void render(void) {
     drawPocket(max_x, max_y, pocketDiameter); // Colț dreapta-sus
     drawPocket(mid_x, min_y, pocketDiameter); // Mijloc jos
     drawPocket(mid_x, max_y, pocketDiameter); // Mijloc sus
+=======
+    // gaurile mesei din colturi
+    float pocketDiameter = global::pocketSize * 2.0f;
+    float gaura_min_x = global::tableMinX, gaura_max_x = global::tableMaxX;
+    float gaura_min_y = global::tableMinY, gaura_max_y = global::tableMaxY;
+    float gaura_mid_x = table_center_x;
+
+    std::vector<glm::vec2> pockets = {
+        {gaura_min_x, gaura_max_y}, // stanga sus
+        {gaura_min_x, gaura_min_y}, // stanga jos
+        {gaura_mid_x, gaura_max_y}, // mijloc sus
+        {gaura_mid_x, gaura_min_y}, // mijloc jos
+        {gaura_max_x, gaura_max_y}, // dreapta sus
+        {gaura_max_x, gaura_min_y}  // dreapta jos
+    };
+
+    drawPocket(pockets[0].x, pockets[0].y, pocketDiameter); // stanga  sus
+    drawPocket(pockets[1].x, pockets[1].y, pocketDiameter); // stanga  jos
+    drawPocket(pockets[2].x, pockets[2].y, pocketDiameter); // mijloc  sus
+    drawPocket(pockets[3].x, pockets[3].y, pocketDiameter); // mijloc  jos
+    drawPocket(pockets[4].x, pockets[4].y, pocketDiameter); // dreapta sus
+    drawPocket(pockets[5].x, pockets[5].y, pocketDiameter); // dreapta jos
+
+
+
+    // aim line
+    if ((aiming || cueStriking) && !physics.getShapes().empty()) {
+        Vec2f ballPos = physics.getShapes()[0]->getPosition();
+        glm::vec2 bPos(ballPos.x, ballPos.y);
+
+        glm::vec2 dir = aiming ? (bPos - cur_mousePos) : (strikeDir * (strikePower / 3.5f));
+        float dist = glm::length(dir);
+
+        if (dist > 5.0f || cueStriking) {
+            glm::vec2 normDir = aiming ? glm::normalize(dir) : strikeDir;
+            float angle = atan2(normDir.y, normDir.x);
+
+            // Cat timp tintim, retragerea tacului este proportionala cu distanta mouse-ului
+            if (aiming) {
+                cuePullOffset = std::min(dist * 0.08f, 45.0f); // se retrage pana la max 120 (no 45!!!) unitati
+            }
+
+            // 1. LINIA DE TINTIRE (doar cat timp tinem click apasat)
+            if (aiming) {
+                float lineDist = dist * 0.5f;
+                glm::vec2 midPoint = bPos + normDir * (lineDist / 2.0f);
+
+                matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(midPoint.x, midPoint.y, 0.0f));
+                glm::mat4 matr_rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+                matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(lineDist, 2.0f, 1.0f));
+                
+                matr_final = matr_resize * matr_transl * matr_rot * matr_scale;
+                glUniform1i(loc_codCol, 2);
+                glUniform1f(loc_lungLinie, lineDist);
+                glUniform4f(loc_matCol, 0.85f, 0.85f, 0.85f, 1.0f);
+                glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            }
+
+            //tacul
+            float cueLength = 220.0f; 
+            float cueWidth = 4.5f; 
+            float ballRadius = global::ballSize;
+
+            //centrul bilei fata de centrul tacului (raportez rotatia la centrul tacului, nu la varful lui)
+            float distFromBallCenter = ballRadius + cuePullOffset + (cueLength / 2.0f);
+            glm::vec2 cueCenter = bPos - normDir * distFromBallCenter;
+
+            glm::mat4 cueTransl = glm::translate(glm::mat4(1.0f), glm::vec3(cueCenter.x, cueCenter.y, 0.0f));
+            glm::mat4 cueRot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+            glm::mat4 cueScale = glm::scale(glm::mat4(1.0f), glm::vec3(cueLength, cueWidth, 1.0f));
+
+            matr_final = matr_resize * cueTransl * cueRot * cueScale;
+            glUniform1i(loc_codCol, -1); // codCol 2 = culoare solida din matCol
+            glUniform4f(loc_matCol, 0.76f, 0.48f, 0.22f, 1.0f); // Culoare lemn tac
+            glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        }
+    }
+
+>>>>>>> Stashed changes
+
+    //Verificare daca bilele au intrat in buzunare
+    {
+        float pocketRadius = global::pocketSize; // raza găurii
+
+        auto& shapes = physics.getShapes();
+        for (int i = (int)shapes.size() - 1; i >= 0; i--) {
+            Vec2f bPos = shapes[i]->getPosition();
+            glm::vec2 ballPos(bPos.x, bPos.y);
+
+            bool inPocket = false;
+            for (const auto& p : pockets) {
+                float dist = glm::distance(ballPos, p);
+                if (dist < pocketRadius) {
+                    inPocket = true;
+                    break;
+                }
+            }
+
+            if (inPocket) {
+                //Bila alba are indexul 0
+                if (i == 0) {
+                    // Exemplu de resetare pentru bila albă:
+                    shapes[i]->setPosition({global::tableMinX + table_w * 0.25f, table_center_y});
+                    shapes[i]->setSpeed({0.0f, 0.0f});
+                    aiming = false;
+                    cueStriking = false;
+                    continue; //Nu stergem bila alba
+                }
+
+                shapes[i]->setPosition({-9999.0f, -9999.0f});
+                shapes[i]->setSpeed({0.0f, 0.0f});
+                }
+            }
+        }
+
+
+
 
 
     // bilele
@@ -273,7 +394,9 @@ int main(int argc, char* argv[])
     
     Initialize();						//  Setarea parametrilor necesari pentru fereastra de vizualizare; 
     glutDisplayFunc(render);	//  Desenarea scenei in fereastra;
-    glutKeyboardFunc(keyboard);
+
+    glutMouseFunc(mouseClick);     
+    glutMotionFunc(mouseMotion);
     glutCloseFunc(Cleanup);				//  Eliberarea resurselor alocate de program;
 
 	//  Bucla principala de procesare a evenimentelor GLUT (functiile care incep cu glut: glutInit etc.) este pornita;
