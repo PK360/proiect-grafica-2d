@@ -23,9 +23,11 @@ uniform sampler2D text;
 uniform int codCol;
 uniform vec4 matCol;
 uniform vec2 uvOffset;
+uniform float lungLinie;
 
 void main(void) {
-  if (codCol == 0) { // bilele de biliard
+  if (codCol == -1) { out_Color = matCol; } // color from uniform
+  else if (codCol == 0) { // bilele de biliard
     // circle mask
     vec2 center = vec2(0.5, 0.5);
     float dist = distance(local_Coord, center);
@@ -56,5 +58,13 @@ void main(void) {
 
     out_Color = vec4(0.0, 0.0, 0.0, 1.0);
   }
-  else if (codCol == 2) { out_Color = matCol; } // color from uniform
+  else if (codCol == 2) { // aim line
+    float dist_along = tex_Coord.x * lungLinie;
+    
+    float visible_size = 20.0, gap_size = 20.0;
+    if (mod(dist_along, visible_size + gap_size) > visible_size) { discard; }
+
+    out_Color = matCol;
+    out_Color.a *= 0.5; // transparency of the line
+  }
 } 
