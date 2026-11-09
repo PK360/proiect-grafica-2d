@@ -10,10 +10,12 @@ public:
 	
 	void setPosition(const Vec2f& pos) { this->position = pos; }
 	void setSpeed(const Vec2f& spd) { this->speed = spd; }
-	
+
     const Vec2f& getUVOffset() const { return uv_offset; }
 	const Vec2f& getPosition() { return position; }
 	const Vec2f& getSpeed() { return speed; }
+    
+	
 	
 	// functions
 	void move(const Vec2f& offset) { position = position + offset; }
