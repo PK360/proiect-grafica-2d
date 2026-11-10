@@ -28,7 +28,7 @@
 const char* shdr_vert = "vert_shader.vert", * shdr_frag = "frag_shader.frag";
 
 // ids
-GLuint id_vao, id_vbo, id_ebo, id_program;
+GLuint id_vao, id_vbo, id_program;
 
 // textures
 std::vector<GLuint> text_balls(16);
@@ -37,19 +37,15 @@ std::vector<GLuint> text_balls(16);
 GLuint loc_codCol, loc_matFinal, loc_matCol, loc_uvOffset, loc_lungLinie;
 
 // transform matrices
-glm::mat4 matr_final, matr_resize, matr_scale, matr_transl;
+glm::mat4 matr_final, matr_resize, matr_scale, matr_transl, matr_rot;
 
 // Physics Engine
 PhysicsOOP physics;
 
 // other variables
-int last_t; bool aiming = false, cueStriking = false;
-float cuePullOffset = 0.0f, strikePower = 0.0f;
+int last_t;
+float cuePullOffset = 0.0f, strikePower = 0.0f, pocketDiameter = 2 * global::pocketSize;
 glm::vec2 strikeDir{ 0.0f, 0.0f }, cur_mousePos{ 0.0f, 0.0f };
-
-float table_w = global::tableMaxX - global::tableMinX, table_h = global::tableMaxY - global::tableMinY;
-float table_center_x = (global::tableMinX + global::tableMaxX) / 2.0f;
-float table_center_y = (global::tableMinY + global::tableMaxY) / 2.0f;
 
 
 
@@ -65,12 +61,6 @@ void createVBO(void) {
         -0.5f,  0.5f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f,   0.0f, 1.0f  // Stanga sus
     };
 
-    //  Indicii care determina ordinea de parcurgere a varfurilor;
-    GLuint Indices[] = {
-            0, 1, 2,  //  Primul triunghi;
-            0, 2, 3   //  Al doilea triunghi;
-    };
-
     //  Se creeaza / se leaga un VAO
     glGenVertexArrays(1, &id_vao);
     glBindVertexArray(id_vao);
@@ -79,11 +69,6 @@ void createVBO(void) {
     glGenBuffers(1, &id_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, id_vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices), Vertices, GL_STATIC_DRAW);
-
-    //  Se creeaza un buffer pentru INDICI;
-    glGenBuffers(1, &id_ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
 
     //  Se activeaza lucrul cu atribute;
     glEnableVertexAttribArray(0);
@@ -134,20 +119,18 @@ void Initialize(void) {
 
     float D = 2 * global::ballSize;    //diametrul bilei
     float rowSpacing = D * 0.866025f; // sqrt(3) / 2, h triunghiului
+    int ballIdx = 0;
 
     //bila alba
-    float cueX = global::tableMinX + table_w * 0.25f;
-    float cueY = table_center_y;
-
     physics.addCircle(new Ball(
-        1,
-        { cueX, cueY },
+        ballIdx, true,
+        { global::tableMinX + global::table_w * 0.25f, global::table_center_y },
         { 0.0f, 0.0f }
     ));
+    ballIdx++;
 
-    float vX = global::tableMinX + table_w * 0.70f;     //coordonatele varfului de unde incepe triunghiul
-    float vY = table_center_y;
-    int ballIdx = 1;
+    float vX = global::tableMinX + global::table_w * 0.70f;     //coordonatele varfului de unde incepe triunghiul
+    float vY = global::table_center_y;
 
     for (int i = 0; i < 5; i++) {
         float x = vX + i * rowSpacing;
@@ -156,7 +139,7 @@ void Initialize(void) {
             float y = vY + (j - i / 2.0f) * D;
 
             physics.addCircle(new Ball(
-                ballIdx + 1,
+                ballIdx + 1, true,
                 { x, y },
                 { 0.0f, 0.0f }
             ));
@@ -188,7 +171,6 @@ void Cleanup(void) {
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glDeleteBuffers(1, &id_vbo);
-    glDeleteBuffers(1, &id_ebo);
 
     glBindVertexArray(0);
     glDeleteVertexArrays(1, &id_vao);
@@ -200,14 +182,14 @@ void Cleanup(void) {
 
 // draw table rectangle
 void drawTable(float padding, glm::vec4 color) {
-    glm::mat4 matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(table_center_x, table_center_y, 0.0f));
-    glm::mat4 matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(table_w + padding, table_h + padding, 1.0f));
+    glm::mat4 matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(global::table_center_x, global::table_center_y, 0.0f));
+    glm::mat4 matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(global::table_w + padding, global::table_h + padding, 1.0f));
     glm::mat4 matr_final = matr_resize * matr_transl * matr_scale;
 
     glUniform1i(loc_codCol, -1);
     glUniform4fv(loc_matCol, 1, &color[0]);
     glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
 // draw pocket circle
@@ -219,7 +201,7 @@ void drawPocket(float x, float y, float size) {
     glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
     glUniform1i(loc_codCol, 1);
 
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
 // draw line between two points
@@ -234,7 +216,7 @@ void drawLine(float x1, float y1, float x2, float y2) {
 
     glm::mat4 fin = matr_resize * t * r * s;
     glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &fin[0][0]);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
 //  Functia de desenare
@@ -243,27 +225,25 @@ void render(void) {
     float frameDt = (now_t - last_t) / 1000.0f;
     float deltatime = frameDt;
     last_t = now_t;
+    
+    const float step = 0.005f;
+    while (deltatime > 0.0f) {
+        physics.update(std::min(deltatime, step));
+        deltatime -= step;
+    }
 
-    // daca tacul este in miscare inspre bila (completeaza animatia)
-    if (cueStriking && !physics.getShapes().empty()) {
-        //float strikeSpeed = std::max(600.0f, strikePower * 1.5f);
+    // daca tacul este in miscare inspre bila (calculeaza pozitia)
+    if (global::cueStriking && !physics.getShapes().empty()) {
         cuePullOffset -= (std::max(600.0f, strikePower * 1.5f)) * frameDt;
         
         //cand offset<=0, adica vf tacului atinge bila, el o va lovi
         if (cuePullOffset <= 0.0f) {
             cuePullOffset = 0.0f;
-            cueStriking = false;
+            global::cueStriking = false;
             physics.getShapes()[0]->setSpeed({ strikeDir.x * strikePower, strikeDir.y * strikePower });
         }
     }
     
-    const float step = 0.005f;
-    while (deltatime > 0.0f) {
-        float deltastep = std::min(deltatime, step);
-        physics.update(deltastep);
-        deltatime -= step;
-    }
-
     // ---------------------------------------------------------
     // CALCULATE AND DISPLAY FPS IN WINDOW TITLE
     // ---------------------------------------------------------
@@ -274,92 +254,73 @@ void render(void) {
     // if (now_t - lastFpsTime >= 1000) { // Update once every second (1000 ms)
     //     // Calculate the exact FPS
     //     float fps = frameCount * 1000.0f / (now_t - lastFpsTime);
-        
+    
     //     // Build the new title string
     //     std::string title = "2D Billiards - FPS: " + std::to_string((int)fps);
-        
+    
     //     // Update the freeglut window
     //     glutSetWindowTitle(title.c_str());
-        
+    
     //     // Reset counters for the next second
     //     frameCount = 0;
     //     lastFpsTime = now_t;
     // }
     // ---------------------------------------------------------
-
-
-
+    
+    
+    
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(id_program);
     glBindVertexArray(id_vao);
-
-
-
+    
+    
+    
     // masa de biliard
-    drawTable(67.5f, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)); // border negru la margine
+    drawTable(67.5f, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));    // border negru la margine
     drawTable(65.0f, glm::vec4(0.5f, 0.35f, 0.035f, 1.0f)); // margine de "lemn"
-    drawTable(2.5f, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)); // border la masa principala
-    drawTable(0.0f, glm::vec4(0.1f, 0.4f, 0.2f, 1.0f)); // masa principala
+    drawTable(2.5f, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));     // border la masa principala
+    drawTable(0.0f, glm::vec4(0.1f, 0.4f, 0.2f, 1.0f));     // masa principala
 
 
 
 
     // gaurile mesei din colturi
-    float pocketDiameter = global::pocketSize * 2.0f;
-    float gaura_min_x = global::tableMinX, gaura_max_x = global::tableMaxX;
-    float gaura_min_y = global::tableMinY, gaura_max_y = global::tableMaxY;
-    float gaura_mid_x = table_center_x;
-
-    std::vector<glm::vec2> pockets = {
-        {gaura_min_x, gaura_max_y}, 
-        {gaura_min_x, gaura_min_y}, 
-        {gaura_mid_x, gaura_max_y}, 
-        {gaura_mid_x, gaura_min_y}, 
-        {gaura_max_x, gaura_max_y}, 
-        {gaura_max_x, gaura_min_y}    
-    };
-
-    drawPocket(gaura_min_x, gaura_max_y, pocketDiameter); // stanga  sus
-    drawPocket(gaura_min_x, gaura_min_y, pocketDiameter); // stanga  jos
-    drawPocket(gaura_mid_x, gaura_max_y, pocketDiameter); // mijloc  sus
-    drawPocket(gaura_mid_x, gaura_min_y, pocketDiameter); // mijloc  jos
-    drawPocket(gaura_max_x, gaura_max_y, pocketDiameter); // dreapta sus
-    drawPocket(gaura_max_x, gaura_min_y, pocketDiameter); // dreapta jos
+    drawPocket(global::pockets[0].x, global::pockets[0].y, pocketDiameter); // stanga sus
+    drawPocket(global::pockets[1].x, global::pockets[1].y, pocketDiameter); // stanga jos
+    drawPocket(global::pockets[2].x, global::pockets[2].y, pocketDiameter); // centru sus
+    drawPocket(global::pockets[3].x, global::pockets[3].y, pocketDiameter); // centru jos
+    drawPocket(global::pockets[4].x, global::pockets[4].y, pocketDiameter); // dreapta sus
+    drawPocket(global::pockets[5].x, global::pockets[5].y, pocketDiameter); // dreapta jos
 
 
 
     // aim line
-    if ((aiming || cueStriking) && !physics.getShapes().empty()) {
+    if ((global::aiming || global::cueStriking) && !physics.getShapes().empty()) {
         Vec2f ballPos = physics.getShapes()[0]->getPosition();
         glm::vec2 bPos(ballPos.x, ballPos.y);
 
-        glm::vec2 dir = aiming ? (bPos - cur_mousePos) : (strikeDir * (strikePower / 3.5f));
+        glm::vec2 dir = (global::aiming) ? (bPos - cur_mousePos) : (strikeDir * (strikePower / 3.5f));
         float dist = glm::length(dir);
 
-        if (dist > 5.0f || cueStriking) {
-            glm::vec2 normDir = aiming ? glm::normalize(dir) : strikeDir;
+        if (dist > 5.0f || global::cueStriking) {
+            glm::vec2 normDir = (global::aiming) ? glm::normalize(dir) : strikeDir;
             float angle = atan2(normDir.y, normDir.x);
 
-            // Cat timp tintim, retragerea tacului este proportionala cu distanta mouse-ului
-            if (aiming) {
-                cuePullOffset = std::min(dist * 0.08f, 45.0f); // se retrage pana la max 120 (no 45!!!) unitati
-            }
-
-            // 1. LINIA DE TINTIRE (doar cat timp tinem click apasat)
-            if (aiming) {
+            if (global::aiming) {
                 float lineDist = dist * 0.5f;
+                cuePullOffset = std::min(dist * 0.08f, 45.0f);
                 glm::vec2 midPoint = bPos + normDir * (lineDist / 2.0f);
 
                 matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(midPoint.x, midPoint.y, 0.0f));
-                glm::mat4 matr_rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
-                matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(lineDist, 2.0f, 1.0f));
-                
+                matr_rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+                matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(lineDist, 2.0f, 1.0f)); 
                 matr_final = matr_resize * matr_transl * matr_rot * matr_scale;
+
                 glUniform1i(loc_codCol, 2);
                 glUniform1f(loc_lungLinie, lineDist);
                 glUniform4f(loc_matCol, 0.85f, 0.85f, 0.85f, 1.0f);
                 glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
-                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
             }
 
             //tacul
@@ -379,48 +340,11 @@ void render(void) {
             glUniform1i(loc_codCol, -1); // codCol 2 = culoare solida din matCol
             glUniform4f(loc_matCol, 0.76f, 0.48f, 0.22f, 1.0f); // Culoare lemn tac
             glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
         }
     }
 
-
-    {
-        float pocketRadius = global::pocketSize; // raza găurii
-
-        auto& shapes = physics.getShapes();
-        for (size_t i = 0; i < shapes.size(); i++) {
-            // Ignorăm bilele care au fost deja trimise în afara mesei
-            if (shapes[i]->getPosition().x < -5000.0f) continue;
-
-            Vec2f bPos = shapes[i]->getPosition();
-            glm::vec2 ballPos(bPos.x, bPos.y);
-
-            bool inPocket = false;
-            for (const auto& p : pockets) {
-                float dist = glm::distance(ballPos, p);
-                if (dist < pocketRadius) {
-                    inPocket = true;
-                    break;
-                }
-            }
-
-            if (inPocket) {
-                // Dacă este bila albă (indexul 0), o resetăm la poziția de start
-                if (i == 0) {
-                    float cueX = global::tableMinX + table_w * 0.25f;
-                    shapes[i]->setPosition({cueX, table_center_y});
-                    shapes[i]->setSpeed({0.0f, 0.0f});
-                    aiming = false;
-                    cueStriking = false;
-                } else {
-                    // Pentru celelalte bile: le trimitem în afara ecranului și le oprim fizica
-                    shapes[i]->setPosition({-9999.0f, -9999.0f});
-                    shapes[i]->setSpeed({0.0f, 0.0f});
-                }
-            }
-        }
-    }
 
 
     // bilele de biliard
@@ -430,17 +354,19 @@ void render(void) {
     float ball_diam = global::ballSize * 2.0f;
     matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(ball_diam, ball_diam, 1.0f));
 
-    const auto& shapes = physics.getShapes();
-    for (size_t i = 0; i < shapes.size(); i++) {
-        glBindTexture(GL_TEXTURE_2D, text_balls[i]);
+    const std::vector<Ball*>& shapes = physics.getShapes();
+    for (unsigned int i = 0; i < shapes.size(); i++) {
+        if (shapes[i]->isActive()) {
+            glBindTexture(GL_TEXTURE_2D, text_balls[i]);
 
-        glUniform2f(loc_uvOffset, shapes[i]->getUVOffset().x, shapes[i]->getUVOffset().y);
+            glUniform2f(loc_uvOffset, shapes[i]->getUVOffset().x, shapes[i]->getUVOffset().y);
 
-        matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(shapes[i]->getPosition().x, shapes[i]->getPosition().y, 0.0f));
-        matr_final = matr_resize * matr_transl * matr_scale;
+            matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(shapes[i]->getPosition().x, shapes[i]->getPosition().y, 0.0f));
+            matr_final = matr_resize * matr_transl * matr_scale;
 
-        glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        }
     }
     
 
@@ -472,7 +398,7 @@ void render(void) {
 
 
 void mouseMotion(int x, int y) {
-    if (aiming) {
+    if (global::aiming) {
         int w = glutGet(GLUT_WINDOW_WIDTH);
         int h = glutGet(GLUT_WINDOW_HEIGHT);
 
@@ -488,16 +414,16 @@ void mouseMotion(int x, int y) {
 
 void mouseClick(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON) {
-        if (state == GLUT_DOWN && !cueStriking) {
+        if (state == GLUT_DOWN && !global::cueStriking) {
             //putem lovi doar daca bila sta pe loc
            // if (!physics.getShapes().empty() && physics.getShapes()[0]->getSpeed().magnitude() < 0.1f) {
-            aiming = true;
+            global::aiming = true;
             mouseMotion(x, y);
 
         }
-        else if (state == GLUT_UP && aiming) {
+        else if (state == GLUT_UP && global::aiming) {
             // loveste mingea
-            aiming = false;
+            global::aiming = false;
             if (!physics.getShapes().empty()) {
                 Vec2f ballPos = physics.getShapes()[0]->getPosition();
                 glm::vec2 bPos(ballPos.x, ballPos.y);
@@ -511,7 +437,7 @@ void mouseClick(int button, int state, int x, int y) {
                     strikePower = dist * powerFactor;
 
                     //pornesc animatia tacului spre bila 
-                    cueStriking = true;
+                    global::cueStriking = true;
                 }
             }
         }

@@ -13,6 +13,8 @@ namespace ourMath {
 		Vec2f operator*(const Vec2f& other) { return Vec2f(x * other.x, y * other.y); }
 		float magnitude() const { return sqrt(x * x + y * y); }
 		float sqrMagnitude() const { return x * x + y * y; }
+		
+		operator glm::vec2() { return glm::vec2(x, y); }
 	};
 
 	inline std::mt19937& rng() {

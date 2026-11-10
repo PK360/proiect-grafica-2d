@@ -66,60 +66,87 @@ public:
             {{min_x, min_y + pocketSize}, {min_x, max_y - pocketSize}}, // stanga
             {{max_x, min_y + pocketSize}, {max_x, max_y - pocketSize}}, // dreapta
             {{min_x + pocketSize, min_y}, {mid_x - pocketSize, min_y}}, // st. jos
-            {{mid_x + pocketSize, min_y}, {max_x - pocketSize, min_y}}, // dr, jos
+            {{mid_x + pocketSize, min_y}, {max_x - pocketSize, min_y}}, // dr. jos
             {{min_x + pocketSize, max_y}, {mid_x - pocketSize, max_y}}, // st. sus
             {{mid_x + pocketSize, max_y}, {max_x - pocketSize, max_y}}  // dr. sus
         };
 
         for (Ball* shape : shapes) {
-            Vec2f pos = shape->getPosition(), speed = shape->getSpeed();
+			if (shape->isActive()) {
+				Vec2f pos = shape->getPosition(), speed = shape->getSpeed();
 
-            // friction
-            speed.x -= speed.x * frict_mult;
-            speed.y -= speed.y * frict_mult;
+				// friction
+				speed.x -= speed.x * frict_mult;
+				speed.y -= speed.y * frict_mult;
 
-			// null movement
-            if (speed.sqrMagnitude() < stop_move) { speed.x = 0.0f; speed.y = 0.0f; }
+				// null movement
+				if (speed.sqrMagnitude() < stop_move) { speed.x = 0.0f; speed.y = 0.0f; }
 
-            float moveX = speed.x * deltatime, moveY = speed.y * deltatime;
-            pos.x += moveX; pos.y += moveY;
-            shape->add_uv(Vec2f(-moveX / circ, moveY / circ));
+				float moveX = speed.x * deltatime, moveY = speed.y * deltatime;
+				pos.x += moveX; pos.y += moveY;
+				shape->add_uv(Vec2f(-moveX / circ, moveY / circ));
 
-			
+				// pocket check
+				{
+					bool inPocket = false;
+					for (const auto& p : global::pockets) {
+						float dist = glm::distance(glm::vec2(pos), p);
+						if (dist < global::pocketSize - global::ballSize) {
+							inPocket = true;
+							break;
+						}
+					}
 
-            // collision
-            for (int i = 0; i < 6; i++) {
-                Vec2f a = walls[i].a, b = walls[i].b;
-                float ab_x = b.x - a.x, ab_y = b.y - a.y;
+					if (inPocket) {
+						if (shape->getNumber() == 0) { // bila alba
+							shape->setPosition({global::tableMinX + global::table_w * 0.25f, global::table_center_y});
+							shape->setSpeed({0.0f, 0.0f});
 
-                // segment projection point
-                float t = ((pos.x - a.x) * ab_x + (pos.y - a.y) * ab_y) / (ab_x * ab_x + ab_y * ab_y);
-                t = std::clamp(t, 0.0f, 1.0f);
+							global::aiming = false; global::cueStriking = false;
+							break;
+						} else { // alte bile
+							shape->setSpeed({0.0f, 0.0f});
+							shape->setActive(false);
 
-				// determine distance from projection to center
-                float close_x = a.x + t * ab_x, close_y = a.y + t * ab_y;
-                float dx = pos.x - close_x, dy = pos.y - close_y;
-                float dist_sqr = dx * dx + dy * dy;
+							break;
+						}
+					}
+				}
 
-				// check if distance is < radius
-                if (dist_sqr < radius * radius && dist_sqr > 0.0001f) {
-                    float dist = std::sqrt(dist_sqr);
-                    
-                    // normala distantei
-					float nx = dx / dist, ny = dy / dist;
+				// collision
+				for (int i = 0; i < 6; i++) {
+					Vec2f a = walls[i].a, b = walls[i].b;
+					float ab_x = b.x - a.x, ab_y = b.y - a.y;
 
-					float overlap = radius - dist;
-                    pos.x += nx * overlap; pos.y += ny * overlap;
+					// segment projection point
+					float t = ((pos.x - a.x) * ab_x + (pos.y - a.y) * ab_y) / (ab_x * ab_x + ab_y * ab_y);
+					t = std::clamp(t, 0.0f, 1.0f);
 
-                    // push ball back
-                    float prod = speed.x * nx + speed.y * ny;
-                    if (prod < 0) { speed.x -= 2.0f * prod * nx; speed.y -= 2.0f * prod * ny; }
-                }
-            }
+					// determine distance from projection to center
+					float close_x = a.x + t * ab_x, close_y = a.y + t * ab_y;
+					float dx = pos.x - close_x, dy = pos.y - close_y;
+					float dist_sqr = dx * dx + dy * dy;
 
-            shape->setPosition(pos);
-            shape->setSpeed(speed);
-        }
+					// check if distance is < radius
+					if (dist_sqr < radius * radius && dist_sqr > 0.0001f) {
+						float dist = std::sqrt(dist_sqr);
+						
+						// normala distantei
+						float nx = dx / dist, ny = dy / dist;
+
+						float overlap = radius - dist;
+						pos.x += nx * overlap; pos.y += ny * overlap;
+
+						// push ball back
+						float prod = speed.x * nx + speed.y * ny;
+						if (prod < 0) { speed.x -= 2.0f * prod * nx; speed.y -= 2.0f * prod * ny; }
+					}
+				}
+
+				shape->setPosition(pos);
+				shape->setSpeed(speed);
+			}
+		}
     }
 
 	void updateGrid() {
@@ -206,7 +233,7 @@ public:
 		if (number > shapes.size()) {
 			for (int i = 0; i < number - shapes.size();i++) {
 				addCircle(new Ball(
-					i + 1,
+					i + 1, true,
 					{ randomFloat(200,1700), randomFloat(200,800) },
 					{ randomFloat(-20, 20), randomFloat(-20, 20) }
 				));
