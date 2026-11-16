@@ -3,6 +3,7 @@
 #include <cmath>
 #include "global.h"
 #include "Ball.h"
+#include "GameManager.h"
 
 class PhysicsOOP
 {
@@ -50,7 +51,7 @@ public:
 
 
 	// functions
-	void update(float deltatime) {
+	void update(float deltatime, GameManager& gameManager) {
         updateGrid();
         updateCollidedCircles();
 
@@ -91,13 +92,15 @@ public:
 					bool inPocket = false;
 					for (const auto& p : global::pockets) {
 						float dist = glm::distance(glm::vec2(pos), p);
-						if (dist < global::pocketSize - global::ballSize) {
+						if (dist < global::pocketSize - global::ballSize / 2.0f) {
 							inPocket = true;
 							break;
 						}
 					}
 
 					if (inPocket) {
+						gameManager.onBallPocketed(shape->getNumber());
+
 						if (shape->getNumber() == 0) { // bila alba
 							shape->setPosition({global::tableMinX + global::table_w * 0.25f, global::table_center_y});
 							shape->setSpeed({0.0f, 0.0f});
@@ -153,7 +156,7 @@ public:
 		for (auto& gridCell : grid) { gridCell.clear(); }
 
 		int shape_nr = shapes.size();
-		for (int i = 0; i < shape_nr; i++) { grid[cellIndex(shapes[i]->getPosition())].push_back(i); }
+		for (int i = 0; i < shape_nr; i++) { if (shapes[i]->isActive()) { grid[cellIndex(shapes[i]->getPosition())].push_back(i); } }
 	}
 
 	int cellIndex(Vec2f position) const {

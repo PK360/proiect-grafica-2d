@@ -43,9 +43,11 @@ glm::mat4 matr_final, matr_resize, matr_scale, matr_transl, matr_rot;
 PhysicsOOP physics;
 
 // other variables
-int last_t;
+int last_t; bool active_turn = false, ballsMoving = false;
 float cuePullOffset = 0.0f, strikePower = 0.0f, pocketDiameter = 2 * global::pocketSize;
 glm::vec2 strikeDir{ 0.0f, 0.0f }, cur_mousePos{ 0.0f, 0.0f };
+
+GameManager gameManager;
 
 
 
@@ -139,7 +141,7 @@ void Initialize(void) {
             float y = vY + (j - i / 2.0f) * D;
 
             physics.addCircle(new Ball(
-                ballIdx + 1, true,
+                ballIdx, true,
                 { x, y },
                 { 0.0f, 0.0f }
             ));
@@ -204,6 +206,20 @@ void drawPocket(float x, float y, float size) {
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
+// draw ball from ui
+void drawUIBall(int ballId, float ballSize, float x, float y) {
+    glBindTexture(GL_TEXTURE_2D, text_balls[ballId]);
+    glUniform2f(loc_uvOffset, 0.0f, 0.0f);
+    
+    glm::mat4 bt = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0.0f));
+    glm::mat4 bs = glm::scale(glm::mat4(1.0f), glm::vec3(ballSize * 2.0f, ballSize * 2.0f, 1.0f));
+    glm::mat4 bFin = matr_resize * bt * bs;
+    
+    glUniform1i(loc_codCol, 0); 
+    glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &bFin[0][0]);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+};
+
 // draw line between two points
 void drawLine(float x1, float y1, float x2, float y2) {
     float cx = (x1 + x2) / 2.0f, cy = (y1 + y2) / 2.0f;
@@ -219,6 +235,55 @@ void drawLine(float x1, float y1, float x2, float y2) {
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
+void drawUI() {
+    float ui_Y = global::tableMaxY + 150.0f, ballSize = global::ballSize * 0.8f; 
+    float p1_startX = global::tableMinX + 50.0f, p2_startX = global::tableMaxX - 50.0f;
+
+    // Helper lambda to draw a cue stick
+    auto drawCue = [&](float x, float y) {
+        glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0.0f));
+        glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(80.0f, 6.0f, 1.0f));
+        glm::mat4 fin = matr_resize * t * s;
+        glUniform1i(loc_codCol, -1);
+        glUniform4f(loc_matCol, 0.76f, 0.48f, 0.22f, 1.0f);
+        glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &fin[0][0]);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    };
+
+    // 1. Draw Cue Sticks for BOTH players permanently
+    drawCue(p1_startX, ui_Y - 30.0f);
+    drawCue(p2_startX, ui_Y - 30.0f);
+
+    // 2. Draw Active Turn Marker (A red diamond pointing down)
+    float markerX = (gameManager.cur_player == 1) ? p1_startX : p2_startX;
+    glm::mat4 t_mark = glm::translate(glm::mat4(1.0f), glm::vec3(markerX, ui_Y - 15.0f, 0.0f));
+    glm::mat4 r_mark = glm::rotate(glm::mat4(1.0f), 0.785398f, glm::vec3(0.0f, 0.0f, 1.0f)); // 45 degrees
+    glm::mat4 s_mark = glm::scale(glm::mat4(1.0f), glm::vec3(12.0f, 12.0f, 1.0f));
+    glm::mat4 fin_mark = matr_resize * t_mark * r_mark * s_mark;
+    
+    glUniform1i(loc_codCol, -1);
+    glUniform4f(loc_matCol, 1.0f, 0.0f, 0.0f, 1.0f); // Red
+    glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &fin_mark[0][0]);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+    // 3. Draw Assigned Ball Types
+    if (gameManager.p1_type != -1) {
+        // Draw them much smaller (ballSize * 0.6f) and further out so they don't look like captured balls
+        drawUIBall((gameManager.p1_type == 1) ? 2 : 10, ballSize * 0.6f, p1_startX - 65.0f, ui_Y);
+        drawUIBall((gameManager.p2_type == 1) ? 2 : 10, ballSize * 0.6f, p2_startX + 65.0f, ui_Y);
+    }
+
+    // 4. Draw Captured Balls
+    for (size_t i = 0; i < gameManager.p1_balls.size(); i++) {
+        drawUIBall(gameManager.p1_balls[i], ballSize, p1_startX + (i * 30.0f), ui_Y);
+    }
+    for (size_t i = 0; i < gameManager.p2_balls.size(); i++) {
+        drawUIBall(gameManager.p2_balls[i], ballSize, p2_startX - (i * 30.0f), ui_Y);
+    }
+}
+
+
+
 //  Functia de desenare
 void render(void) {
     int now_t = glutGet(GLUT_ELAPSED_TIME);
@@ -226,10 +291,25 @@ void render(void) {
     float deltatime = frameDt;
     last_t = now_t;
     
+    // 1. Pass the game manager to the sub-step loop
     const float step = 0.005f;
     while (deltatime > 0.0f) {
-        physics.update(std::min(deltatime, step));
+        physics.update(std::min(deltatime, step), gameManager);
         deltatime -= step;
+    }
+
+    // 2. Check if balls have completely stopped to end the turn
+    ballsMoving = false;
+    for (Ball* b : physics.getShapes()) {
+        if (b->isActive() && b->getSpeed().sqrMagnitude() > 0.1f) {
+            ballsMoving = true;
+            break;
+        }
+    }
+
+    if (active_turn && !ballsMoving && !global::cueStriking) {
+        gameManager.endTurn();
+        active_turn = false; 
     }
 
     // daca tacul este in miscare inspre bila (calculeaza pozitia)
@@ -356,7 +436,8 @@ void render(void) {
 
     const std::vector<Ball*>& shapes = physics.getShapes();
     for (unsigned int i = 0; i < shapes.size(); i++) {
-        if (shapes[i]->isActive()) {
+        // UNCOMMENT THIS: Only draw active balls on the main table
+        if (shapes[i]->isActive()) { 
             glBindTexture(GL_TEXTURE_2D, text_balls[i]);
 
             glUniform2f(loc_uvOffset, shapes[i]->getUVOffset().x, shapes[i]->getUVOffset().y);
@@ -368,6 +449,8 @@ void render(void) {
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         }
     }
+    
+    drawUI();
     
 
 
@@ -416,10 +499,10 @@ void mouseClick(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON) {
         if (state == GLUT_DOWN && !global::cueStriking) {
             //putem lovi doar daca bila sta pe loc
-           // if (!physics.getShapes().empty() && physics.getShapes()[0]->getSpeed().magnitude() < 0.1f) {
-            global::aiming = true;
-            mouseMotion(x, y);
-
+            if (!ballsMoving) {
+                global::aiming = true;
+                mouseMotion(x, y);
+            }
         }
         else if (state == GLUT_UP && global::aiming) {
             // loveste mingea
@@ -436,8 +519,7 @@ void mouseClick(int button, int state, int x, int y) {
                     float powerFactor = 3.5f;
                     strikePower = dist * powerFactor;
 
-                    //pornesc animatia tacului spre bila 
-                    global::cueStriking = true;
+                    global::cueStriking = true; active_turn = true;
                 }
             }
         }
