@@ -44,7 +44,7 @@ glm::mat4 matr_final, matr_resize, matr_scale, matr_transl, matr_rot;
 PhysicsOOP physics;
 
 // other variables
-int last_t;
+int last_t; bool is_moving = false;
 float cuePullOffset = 0.0f, strikePower = 0.0f, pocketDiameter = 2 * global::pocketSize;
 glm::vec2 strikeDir{ 0.0f, 0.0f }, cur_mousePos{ 0.0f, 0.0f };
 
@@ -244,7 +244,7 @@ void drawScore() {
     float uiY = global::tableMaxY + 80.0f; 
     
     drawText(text_score, startX, uiY, 128.0f, 36.0f, 0.0f, 1.0f); // score: text
-    drawText(text_digits, startX + 90.0f, uiY, 24.0f, 36.0f, (global::score * 0.1f) * 0.1f, 0.1f); // cifra zecilor
+    drawText(text_digits, startX + 90.0f, uiY, 24.0f, 36.0f, (global::score / 10) * 0.1f, 0.1f); // cifra zecilor
     drawText(text_digits, startX + 115.0f, uiY, 24.0f, 36.0f, (global::score % 10) * 0.1f, 0.1f); // cifra unitatilor
 }
 
@@ -261,6 +261,15 @@ void render(void) {
     while (deltatime > 0.0f) {
         physics.update(std::min(deltatime, step));
         deltatime -= step;
+    }
+
+    // check daca se misca bilele dupa updates
+    is_moving = false;
+    for (Ball* b : physics.getShapes()) {
+        if (b->isActive() && b->getSpeed().sqrMagnitude() > 0.1f) {
+            is_moving = true;
+            break;
+        }
     }
 
     // daca tacul este in miscare inspre bila (calculeaza pozitia)
@@ -446,11 +455,10 @@ void mouseMotion(int x, int y) {
 void mouseClick(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON) {
         if (state == GLUT_DOWN && !global::cueStriking) {
-            //putem lovi doar daca bila sta pe loc
-           // if (!physics.getShapes().empty() && physics.getShapes()[0]->getSpeed().magnitude() < 0.1f) {
-            global::aiming = true;
-            mouseMotion(x, y);
-
+            if (!is_moving) {
+                global::aiming = true;
+                mouseMotion(x, y);
+            }
         }
         else if (state == GLUT_UP && global::aiming) {
             // loveste mingea
