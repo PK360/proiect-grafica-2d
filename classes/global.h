@@ -4,6 +4,7 @@ namespace global {
 	inline float pocketSize = ballSize * 1.65f;
 
 	inline bool aiming = false, cueStriking = false;
+	inline int score = 0;
 
 
 	inline float win_w = 1000.0f, win_h = 750.0f, winpos_x = 100.0f, winpos_y = 100.0f;

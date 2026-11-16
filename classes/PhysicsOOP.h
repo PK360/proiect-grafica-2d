@@ -108,6 +108,11 @@ public:
 							shape->setSpeed({0.0f, 0.0f});
 							shape->setActive(false);
 
+                            global::score++;
+                            if (global::score >= 15) {
+                                exit(0); // All balls pocketed, close the game!
+                            }
+
 							break;
 						}
 					}

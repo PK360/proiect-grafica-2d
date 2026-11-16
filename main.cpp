@@ -32,9 +32,10 @@ GLuint id_vao, id_vbo, id_program;
 
 // textures
 std::vector<GLuint> text_balls(16);
+GLuint text_score, text_digits;
 
 // uniform locations
-GLuint loc_codCol, loc_matFinal, loc_matCol, loc_uvOffset, loc_lungLinie;
+GLuint loc_codCol, loc_matFinal, loc_matCol, loc_uvOffset, loc_lungLinie, loc_uvScale;
 
 // transform matrices
 glm::mat4 matr_final, matr_resize, matr_scale, matr_transl, matr_rot;
@@ -139,7 +140,7 @@ void Initialize(void) {
             float y = vY + (j - i / 2.0f) * D;
 
             physics.addCircle(new Ball(
-                ballIdx + 1, true,
+                ballIdx, true,
                 { x, y },
                 { 0.0f, 0.0f }
             ));
@@ -153,9 +154,13 @@ void Initialize(void) {
 
     loc_codCol = glGetUniformLocation(id_program, "codCol");
     loc_matCol = glGetUniformLocation(id_program, "matCol");
+    loc_uvScale = glGetUniformLocation(id_program, "uvScale");
     loc_matFinal = glGetUniformLocation(id_program, "matFinal");
     loc_uvOffset = glGetUniformLocation(id_program, "uvOffset");
     loc_lungLinie = glGetUniformLocation(id_program, "lungLinie");
+
+    text_score = LoadTexture("textures/score/score.png"); 
+    text_digits = LoadTexture("textures/score/digits.png");
 
     matr_resize = glm::ortho(global::range_x.x, global::range_x.y, global::range_y.x, global::range_y.y);
     last_t = glutGet(GLUT_ELAPSED_TIME);
@@ -182,9 +187,9 @@ void Cleanup(void) {
 
 // draw table rectangle
 void drawTable(float padding, glm::vec4 color) {
-    glm::mat4 matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(global::table_center_x, global::table_center_y, 0.0f));
-    glm::mat4 matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(global::table_w + padding, global::table_h + padding, 1.0f));
-    glm::mat4 matr_final = matr_resize * matr_transl * matr_scale;
+    matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(global::table_center_x, global::table_center_y, 0.0f));
+    matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(global::table_w + padding, global::table_h + padding, 1.0f));
+    matr_final = matr_resize * matr_transl * matr_scale;
 
     glUniform1i(loc_codCol, -1);
     glUniform4fv(loc_matCol, 1, &color[0]);
@@ -194,13 +199,12 @@ void drawTable(float padding, glm::vec4 color) {
 
 // draw pocket circle
 void drawPocket(float x, float y, float size) {
-    glm::mat4 matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0.0f));
-    glm::mat4 matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(size, size, 1.0f));
-    glm::mat4 matr_final = matr_resize * matr_transl * matr_scale;
+    matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0.0f));
+    matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(size, size, 1.0f));
+    matr_final = matr_resize * matr_transl * matr_scale;
 
-    glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
     glUniform1i(loc_codCol, 1);
-
+    glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
@@ -210,14 +214,41 @@ void drawLine(float x1, float y1, float x2, float y2) {
     float len = std::sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
     float angle = atan2(y2 - y1, x2 - x1);
 
-    glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(cx, cy, 0.0f));
-    glm::mat4 r = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
-    glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(len, 2.0f, 1.0f));
+    matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(cx, cy, 0.0f));
+    matr_rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+    matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(len, 2.0f, 1.0f));
+    matr_final = matr_resize * matr_transl * matr_rot * matr_scale;
 
-    glm::mat4 fin = matr_resize * t * r * s;
-    glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &fin[0][0]);
+    glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
+
+// draw text texture
+void drawText(GLuint tex, float x, float y, float w, float h, float uvOffX, float uvScX) {
+    glBindTexture(GL_TEXTURE_2D, tex);
+    
+    matr_transl = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0.0f));
+    matr_scale = glm::scale(glm::mat4(1.0f), glm::vec3(w, h, 1.0f));
+    matr_final = matr_resize * matr_transl * matr_scale;
+
+    glUniform1i(loc_codCol, 3);
+    glUniform2f(loc_uvScale, uvScX, 1.0f);    
+    glUniform2f(loc_uvOffset, uvOffX, 0.0f);
+    glUniformMatrix4fv(loc_matFinal, 1, GL_FALSE, &matr_final[0][0]);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+}
+
+// draw all of the score
+void drawScore() {
+    float startX = global::tableMinX + 150.0f;
+    float uiY = global::tableMaxY + 80.0f; 
+    
+    drawText(text_score, startX, uiY, 128.0f, 36.0f, 0.0f, 1.0f); // score: text
+    drawText(text_digits, startX + 90.0f, uiY, 24.0f, 36.0f, (global::score * 0.1f) * 0.1f, 0.1f); // cifra zecilor
+    drawText(text_digits, startX + 115.0f, uiY, 24.0f, 36.0f, (global::score % 10) * 0.1f, 0.1f); // cifra unitatilor
+}
+
+
 
 //  Functia de desenare
 void render(void) {
@@ -369,7 +400,7 @@ void render(void) {
         }
     }
     
-
+    drawScore();
 
     // debug lines for the collision
     // glUniform1i(loc_codCol, 4);

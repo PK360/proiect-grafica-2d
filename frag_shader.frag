@@ -20,10 +20,11 @@ out vec4 out_Color;		//	Culoarea actualizata;
 
 //  Variabile uniforme;
 uniform sampler2D text;
-uniform int codCol;
 uniform vec4 matCol;
 uniform vec2 uvOffset;
+uniform vec2 uvScale;
 uniform float lungLinie;
+uniform int codCol;
 
 void main(void) {
   if (codCol == -1) { out_Color = matCol; } // color from uniform
@@ -66,5 +67,13 @@ void main(void) {
 
     out_Color = matCol;
     out_Color.a *= 0.5; // transparency of the line
+  }
+  else if (codCol == 3) { // score stuff
+      vec2 final_uv = tex_Coord * uvScale + uvOffset;
+      
+      vec4 tex_color = texture(text, final_uv);
+      if (tex_color.a < 0.1) { discard; } // transparency
+      
+      out_Color = tex_color;
   }
 } 
