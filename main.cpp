@@ -439,14 +439,9 @@ void render(void) {
 
 void mouseMotion(int x, int y) {
     if (global::aiming) {
-        int w = glutGet(GLUT_WINDOW_WIDTH);
-        int h = glutGet(GLUT_WINDOW_HEIGHT);
+        int w = glutGet(GLUT_WINDOW_WIDTH), h = glutGet(GLUT_WINDOW_HEIGHT);
+        float width = global::range_x.y - global::range_x.x, height = global::range_y.y - global::range_y.x;
 
-        // Dynamically calculate based on your actual camera ranges
-        float width = global::range_x.y - global::range_x.x;
-        float height = global::range_y.y - global::range_y.x;
-
-        // This perfectly syncs the mouse exactly to where your camera is looking
         cur_mousePos.x = global::range_x.x + ((float)x / (float)w) * width;
         cur_mousePos.y = global::range_y.x + (1.0f - ((float)y / (float)h)) * height;
     }
