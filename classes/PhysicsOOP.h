@@ -109,9 +109,7 @@ public:
 							shape->setActive(false);
 
                             global::score++;
-                            if (global::score >= 15) {
-                                exit(0); // All balls pocketed, close the game!
-                            }
+                            if (global::score >= 15) { exit(0); }
 
 							break;
 						}
